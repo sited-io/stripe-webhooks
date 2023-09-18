@@ -34,6 +34,8 @@ job "stripe-webhooks" {
         type     = "http"
         interval = "20s"
         timeout  = "2s"
+        path     = "/health"
+        method   = "GET"
       }
     }
 
