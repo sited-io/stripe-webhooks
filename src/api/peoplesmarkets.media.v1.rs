@@ -15,6 +15,8 @@ pub struct PutMediaSubscriptionRequest {
     pub subscription_status: ::prost::alloc::string::String,
     #[prost(uint64, tag = "7")]
     pub payed_at: u64,
+    #[prost(uint64, tag = "8")]
+    pub payed_until: u64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

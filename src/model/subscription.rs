@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use deadpool_postgres::tokio_postgres::Row;
-use deadpool_postgres::Transaction;
-use sea_query::{Asterisk, Expr, Iden, PostgresQueryBuilder, Query};
+use deadpool_postgres::Pool;
+use sea_query::{Iden, OnConflict, PostgresQueryBuilder, Query};
 use sea_query_postgres::PostgresBinder;
 use uuid::Uuid;
 
@@ -19,6 +19,7 @@ enum SubscriptionIden {
     CurrentPeriodEnd,
     SubscriptionStatus,
     PayedAt,
+    PayedUntil,
     CreatedAt,
     UpdatedAt,
 }
@@ -33,148 +34,116 @@ pub struct Subscription {
     pub current_period_end: Option<DateTime<Utc>>,
     pub subscription_status: Option<String>,
     pub payed_at: Option<DateTime<Utc>>,
+    pub payed_until: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl Subscription {
-    pub async fn create<'a>(
-        transaction: &Transaction<'a>,
-        stripe_subscription_id: String,
-        buyer_user_id: Option<String>,
-        offer_id: Option<Uuid>,
-        current_period_start: Option<DateTime<Utc>>,
-        current_period_end: Option<DateTime<Utc>>,
-        subscription_status: Option<String>,
-        payed_at: Option<DateTime<Utc>>,
+    const PUT_CHECKOUT_SESSION_COLUMNS: [SubscriptionIden; 3] = [
+        SubscriptionIden::StripeSubscriptionId,
+        SubscriptionIden::BuyerUserId,
+        SubscriptionIden::OfferId,
+    ];
+
+    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 4] = [
+        SubscriptionIden::StripeSubscriptionId,
+        SubscriptionIden::CurrentPeriodStart,
+        SubscriptionIden::CurrentPeriodEnd,
+        SubscriptionIden::SubscriptionStatus,
+    ];
+
+    const PUT_INVOICE_COLUMNS: [SubscriptionIden; 3] = [
+        SubscriptionIden::StripeSubscriptionId,
+        SubscriptionIden::PayedAt,
+        SubscriptionIden::PayedUntil,
+    ];
+
+    pub async fn put_checkout_session(
+        pool: &Pool,
+        stripe_subscription_id: &String,
+        buyer_user_id: &String,
+        offer_id: &Uuid,
     ) -> Result<Self, DbError> {
+        let conn = pool.get().await?;
+
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
-            .columns([
-                SubscriptionIden::StripeSubscriptionId,
-                SubscriptionIden::BuyerUserId,
-                SubscriptionIden::OfferId,
-                SubscriptionIden::CurrentPeriodStart,
-                SubscriptionIden::CurrentPeriodEnd,
-                SubscriptionIden::SubscriptionStatus,
-                SubscriptionIden::PayedAt,
-            ])
+            .columns(Self::PUT_CHECKOUT_SESSION_COLUMNS)
             .values([
                 stripe_subscription_id.into(),
                 buyer_user_id.into(),
-                offer_id.into(),
-                current_period_start.into(),
-                current_period_end.into(),
-                subscription_status.into(),
-                payed_at.into(),
+                (*offer_id).into(),
             ])?
-            .returning_all()
-            .build_postgres(PostgresQueryBuilder);
-
-        let row = transaction
-            .query_one(sql.as_str(), &values.as_params())
-            .await?;
-
-        Ok(Self::from(row))
-    }
-
-    pub async fn get<'a>(
-        transaction: &Transaction<'a>,
-        stripe_subscription_id: &String,
-    ) -> Result<Option<Self>, DbError> {
-        let (sql, values) = Query::select()
-            .column(Asterisk)
-            .from(SubscriptionIden::Table)
-            .and_where(
-                Expr::col(SubscriptionIden::StripeSubscriptionId)
-                    .eq(stripe_subscription_id),
-            )
-            .build_postgres(PostgresQueryBuilder);
-
-        let row = transaction
-            .query_opt(sql.as_str(), &values.as_params())
-            .await?;
-
-        Ok(row.map(Self::from))
-    }
-
-    pub async fn update<'a>(
-        transaction: &Transaction<'a>,
-        stripe_subscription_id: String,
-        buyer_user_id: Option<String>,
-        offer_id: Option<Uuid>,
-        current_period_start: Option<DateTime<Utc>>,
-        current_period_end: Option<DateTime<Utc>>,
-        subscription_status: Option<String>,
-    ) -> Result<Self, DbError> {
-        let (sql, values) = {
-            let mut query = Query::update();
-
-            query.table(SubscriptionIden::Table);
-
-            if buyer_user_id.is_some() {
-                query.value(SubscriptionIden::BuyerUserId, buyer_user_id);
-            }
-
-            if offer_id.is_some() {
-                query.value(SubscriptionIden::OfferId, offer_id);
-            }
-
-            if current_period_start.is_some() {
-                query.value(
-                    SubscriptionIden::CurrentPeriodStart,
-                    current_period_start,
-                );
-            }
-
-            if current_period_end.is_some() {
-                query.value(
-                    SubscriptionIden::CurrentPeriodEnd,
-                    current_period_end,
-                );
-            }
-
-            if subscription_status.is_some() {
-                query.value(
-                    SubscriptionIden::SubscriptionStatus,
-                    subscription_status,
-                );
-            }
-
-            query
-                .and_where(
-                    Expr::col(SubscriptionIden::StripeSubscriptionId)
-                        .eq(stripe_subscription_id),
-                )
-                .returning_all()
-                .build_postgres(PostgresQueryBuilder)
-        };
-
-        let row = transaction
-            .query_one(sql.as_str(), values.as_params().as_ref())
-            .await?;
-
-        Ok(Self::from(row))
-    }
-
-    pub async fn update_payed_at<'a>(
-        transaction: &Transaction<'a>,
-        stripe_subscription_id: &String,
-        payed_at: DateTime<Utc>,
-    ) -> Result<Self, DbError> {
-        let (sql, values) = Query::update()
-            .table(SubscriptionIden::Table)
-            .value(SubscriptionIden::PayedAt, Some(payed_at))
-            .and_where(
-                Expr::col(SubscriptionIden::StripeSubscriptionId)
-                    .eq(stripe_subscription_id),
+            .on_conflict(
+                OnConflict::column(SubscriptionIden::StripeSubscriptionId)
+                    .update_columns(Self::PUT_CHECKOUT_SESSION_COLUMNS)
+                    .to_owned(),
             )
             .returning_all()
             .build_postgres(PostgresQueryBuilder);
 
-        let row = transaction
-            .query_one(sql.as_str(), values.as_params().as_ref())
-            .await?;
+        let row = conn.query_one(sql.as_str(), &values.as_params()).await?;
+
+        Ok(Self::from(row))
+    }
+
+    pub async fn put_subscription(
+        pool: &Pool,
+        stripe_subscription_id: &String,
+        current_period_start: &DateTime<Utc>,
+        current_period_end: &DateTime<Utc>,
+        subscription_status: &String,
+    ) -> Result<Self, DbError> {
+        let conn = pool.get().await?;
+
+        let (sql, values) = Query::insert()
+            .into_table(SubscriptionIden::Table)
+            .columns(Self::PUT_SUBSCRIPTION_COLUMNS)
+            .values([
+                stripe_subscription_id.into(),
+                (*current_period_start).into(),
+                (*current_period_end).into(),
+                subscription_status.into(),
+            ])?
+            .on_conflict(
+                OnConflict::column(SubscriptionIden::StripeSubscriptionId)
+                    .update_columns(Self::PUT_SUBSCRIPTION_COLUMNS)
+                    .to_owned(),
+            )
+            .returning_all()
+            .build_postgres(PostgresQueryBuilder);
+
+        let row = conn.query_one(sql.as_str(), &values.as_params()).await?;
+
+        Ok(Self::from(row))
+    }
+
+    pub async fn put_invoice(
+        pool: &Pool,
+        stripe_subscription_id: &String,
+        payed_at: &DateTime<Utc>,
+        payed_until: &DateTime<Utc>,
+    ) -> Result<Self, DbError> {
+        let conn = pool.get().await?;
+
+        let (sql, values) = Query::insert()
+            .into_table(SubscriptionIden::Table)
+            .columns(Self::PUT_INVOICE_COLUMNS)
+            .values([
+                stripe_subscription_id.into(),
+                (*payed_at).into(),
+                (*payed_until).into(),
+            ])?
+            .on_conflict(
+                OnConflict::column(SubscriptionIden::StripeSubscriptionId)
+                    .update_columns(Self::PUT_INVOICE_COLUMNS)
+                    .to_owned(),
+            )
+            .returning_all()
+            .build_postgres(PostgresQueryBuilder);
+
+        let row = conn.query_one(sql.as_str(), &values.as_params()).await?;
 
         Ok(Self::from(row))
     }
@@ -198,6 +167,8 @@ impl From<Row> for Subscription {
             subscription_status: row
                 .get(SubscriptionIden::SubscriptionStatus.to_string().as_str()),
             payed_at: row.get(SubscriptionIden::PayedAt.to_string().as_str()),
+            payed_until: row
+                .get(SubscriptionIden::PayedUntil.to_string().as_str()),
             created_at: row
                 .get(SubscriptionIden::CreatedAt.to_string().as_str()),
             updated_at: row

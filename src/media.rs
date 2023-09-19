@@ -34,6 +34,7 @@ impl MediaService {
         current_period_end: u64,
         subscription_status: String,
         payed_at: u64,
+        payed_until: u64,
     ) -> Result<(), Status> {
         let mut client = self.media_subscription_client.clone();
 
@@ -45,6 +46,7 @@ impl MediaService {
             current_period_end,
             subscription_status,
             payed_at,
+            payed_until,
         });
 
         self.credentials_service

@@ -7,7 +7,7 @@ use stripe::{
 };
 
 use crate::model::Subscription;
-use crate::{DbError, HttpError, MediaService};
+use crate::{HttpError, MediaService};
 
 #[derive(Debug, Clone)]
 pub struct EventService {
@@ -46,6 +46,7 @@ impl EventService {
             current_period_end,
             subscription_status,
             payed_at,
+            payed_until,
             ..
         } = subscription;
 
@@ -56,6 +57,7 @@ impl EventService {
             Some(current_period_end),
             Some(subscription_status),
             Some(payed_at),
+            Some(payed_until),
         ) = (
             buyer_user_id,
             offer_id,
@@ -63,6 +65,7 @@ impl EventService {
             current_period_end,
             subscription_status,
             payed_at,
+            payed_until,
         ) {
             self.media_service
                 .put_media_subscription(
@@ -73,6 +76,7 @@ impl EventService {
                     current_period_end.timestamp().try_into().unwrap(),
                     subscription_status,
                     payed_at.timestamp().try_into().unwrap(),
+                    payed_until.timestamp().try_into().unwrap(),
                 )
                 .await
                 .map_err(|err| {
@@ -90,72 +94,30 @@ impl EventService {
         &self,
         checkout_session: CheckoutSession,
     ) -> Result<HttpResponse, HttpError> {
-        if let Some(stripe_subscription) = checkout_session.subscription {
-            let buyer_user_id = checkout_session
-                .metadata
-                .get(Self::METADATA_KEY_USER_ID)
-                .cloned();
-
-            let offer_id = checkout_session
+        if let (
+            Some(stripe_subscription),
+            Some(buyer_user_id),
+            Some(offer_id),
+        ) = (
+            checkout_session.subscription,
+            checkout_session.metadata.get(Self::METADATA_KEY_USER_ID),
+            checkout_session
                 .metadata
                 .get(Self::METADATA_KEY_OFFER_ID)
-                .and_then(|id| id.parse().ok());
-
-            let mut current_period_start = None;
-            let mut current_period_end = None;
-            let mut subscription_status = None;
-
+                .and_then(|id| id.parse().ok()),
+        ) {
             let stripe_subscription_id = match stripe_subscription {
                 Expandable::Id(id) => id.to_string(),
-                Expandable::Object(s) => {
-                    current_period_start = DateTime::<Utc>::from_timestamp(
-                        s.current_period_start,
-                        0,
-                    );
-                    current_period_end = DateTime::<Utc>::from_timestamp(
-                        s.current_period_end,
-                        0,
-                    );
-                    subscription_status = Some(s.status.to_string());
-
-                    s.id.to_string()
-                }
+                Expandable::Object(s) => s.id.to_string(),
             };
 
-            let mut conn = self.pool.get().await.map_err(DbError::from)?;
-            let transaction =
-                conn.transaction().await.map_err(DbError::from)?;
-
-            let found_subscription =
-                Subscription::get(&transaction, &stripe_subscription_id)
-                    .await?;
-
-            let updated_subscription = if found_subscription.is_some() {
-                Subscription::update(
-                    &transaction,
-                    stripe_subscription_id,
-                    buyer_user_id,
-                    offer_id,
-                    current_period_start,
-                    current_period_end,
-                    subscription_status,
-                )
-                .await?
-            } else {
-                Subscription::create(
-                    &transaction,
-                    stripe_subscription_id,
-                    buyer_user_id,
-                    offer_id,
-                    current_period_start,
-                    current_period_end,
-                    subscription_status,
-                    None,
-                )
-                .await?
-            };
-
-            transaction.commit().await.map_err(DbError::from)?;
+            let updated_subscription = Subscription::put_checkout_session(
+                &self.pool,
+                &stripe_subscription_id,
+                &buyer_user_id,
+                &offer_id,
+            )
+            .await?;
 
             self.send_updated_subscription(updated_subscription).await?;
         }
@@ -168,46 +130,25 @@ impl EventService {
         subscription: StripeSubscription,
     ) -> Result<HttpResponse, HttpError> {
         let stripe_subscription_id = subscription.id.to_string();
+
         let current_period_start = DateTime::<Utc>::from_timestamp(
             subscription.current_period_start,
             0,
-        );
+        )
+        .unwrap();
+
         let current_period_end =
-            DateTime::<Utc>::from_timestamp(subscription.current_period_end, 0);
-        let subscription_status = Some(subscription.status.to_string());
+            DateTime::<Utc>::from_timestamp(subscription.current_period_end, 0)
+                .unwrap();
 
-        let mut conn = self.pool.get().await.map_err(DbError::from)?;
-        let transaction = conn.transaction().await.map_err(DbError::from)?;
-
-        let found_subscription =
-            Subscription::get(&transaction, &stripe_subscription_id).await?;
-
-        let updated_subscription = if found_subscription.is_some() {
-            Subscription::update(
-                &transaction,
-                stripe_subscription_id,
-                None,
-                None,
-                current_period_start,
-                current_period_end,
-                subscription_status,
-            )
-            .await?
-        } else {
-            Subscription::create(
-                &transaction,
-                stripe_subscription_id,
-                None,
-                None,
-                current_period_start,
-                current_period_end,
-                subscription_status,
-                None,
-            )
-            .await?
-        };
-
-        transaction.commit().await.map_err(DbError::from)?;
+        let updated_subscription = Subscription::put_subscription(
+            &self.pool,
+            &stripe_subscription_id,
+            &current_period_start,
+            &current_period_end,
+            &subscription.status.to_string(),
+        )
+        .await?;
 
         self.send_updated_subscription(updated_subscription).await?;
 
@@ -224,54 +165,31 @@ impl EventService {
                 Expandable::Object(s) => s.id.to_string(),
             };
 
-            let payed_at = match invoice.status_transitions.and_then(|s| {
-                s.paid_at
-                    .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
-            }) {
-                Some(p) => p,
-                None => return Ok(HttpResponse::Ok().finish()),
+            let payed_at = if let Some(payed_at) = invoice
+                .period_start
+                .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+            {
+                payed_at
+            } else {
+                return Ok(HttpResponse::Ok().finish());
             };
 
-            let mut conn = self.pool.get().await.map_err(DbError::from)?;
-            let transaction =
-                conn.transaction().await.map_err(DbError::from)?;
+            let payed_until = if let Some(payed_until) = invoice
+                .period_end
+                .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+            {
+                payed_until
+            } else {
+                return Ok(HttpResponse::Ok().finish());
+            };
 
-            let found_subscription =
-                Subscription::get(&transaction, &stripe_subscription_id)
-                    .await?;
-
-            let updated_subscription =
-                if let Some(found_subscription) = found_subscription {
-                    // if saved payed_at is further in time than timestamp from event, return early
-                    if matches!(
-                        found_subscription.payed_at,
-                        Some(old_payed_at)
-                        if old_payed_at > payed_at
-                    ) {
-                        return Ok(HttpResponse::Ok().finish());
-                    }
-
-                    Subscription::update_payed_at(
-                        &transaction,
-                        &stripe_subscription_id,
-                        payed_at,
-                    )
-                    .await?
-                } else {
-                    Subscription::create(
-                        &transaction,
-                        stripe_subscription_id,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        Some(payed_at),
-                    )
-                    .await?
-                };
-
-            transaction.commit().await.map_err(DbError::from)?;
+            let updated_subscription = Subscription::put_invoice(
+                &self.pool,
+                &stripe_subscription_id,
+                &payed_at,
+                &payed_until,
+            )
+            .await?;
 
             self.send_updated_subscription(updated_subscription).await?;
         }

@@ -1,0 +1,4 @@
+ALTER TABLE
+  subscriptions
+ADD
+  COLUMN payed_until TIMESTAMP WITH TIME ZONE;
