@@ -57,20 +57,36 @@ impl CredentialsService {
 
         let now = Utc::now();
 
-        let response: AuthResponse = client
+        let response = match client
             .post(self.get_token_url())
             .basic_auth(&self.client_id, Some(&self.client_secret))
             .form(&Self::AUTH_PARAMS)
             .send()
             .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
+        {
+            Ok(response) => {
+                tracing::log::debug!(
+                    "[CredentialsService.get_token] {response:?}"
+                );
+                response
+            }
+            Err(err) => {
+                tracing::log::error!("[CredentialsService.get_token] {err}");
+                panic!()
+            }
+        };
+
+        let auth_response: AuthResponse = match response.json().await {
+            Ok(auth_response) => auth_response,
+            Err(err) => {
+                tracing::log::error!("[CredentialsService.get_token] {err}");
+                panic!()
+            }
+        };
 
         let new_credentials = Credential {
-            access_token: response.access_token,
-            expires_at: now + Duration::seconds(response.expires_in),
+            access_token: auth_response.access_token,
+            expires_at: now + Duration::seconds(auth_response.expires_in),
         };
 
         self.credential.replace(new_credentials);
