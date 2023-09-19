@@ -159,40 +159,44 @@ impl EventService {
         &self,
         invoice: Invoice,
     ) -> Result<HttpResponse, HttpError> {
-        if let Some(stripe_subscription) = invoice.subscription {
-            let stripe_subscription_id = match stripe_subscription {
-                Expandable::Id(id) => id.to_string(),
-                Expandable::Object(s) => s.id.to_string(),
-            };
+        for line in invoice.lines.data {
+            if let Some(stripe_subscription) = line.subscription {
+                let stripe_subscription_id =
+                    stripe_subscription.id().to_string();
 
-            let payed_at = if let Some(payed_at) = invoice
-                .period_start
-                .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
-            {
-                payed_at
-            } else {
-                return Ok(HttpResponse::Ok().finish());
-            };
+                let payed_at = if let Some(payed_at) = line
+                    .period
+                    .as_ref()
+                    .and_then(|p| p.start)
+                    .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+                {
+                    payed_at
+                } else {
+                    return Ok(HttpResponse::Ok().finish());
+                };
 
-            let payed_until = if let Some(payed_until) = invoice
-                .period_end
-                .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
-            {
-                payed_until
-            } else {
-                return Ok(HttpResponse::Ok().finish());
-            };
+                let payed_until = if let Some(payed_until) = line
+                    .period
+                    .and_then(|p| p.end)
+                    .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+                {
+                    payed_until
+                } else {
+                    return Ok(HttpResponse::Ok().finish());
+                };
 
-            let updated_subscription = Subscription::put_invoice(
-                &self.pool,
-                &stripe_subscription_id,
-                &payed_at,
-                &payed_until,
-            )
-            .await?;
+                let updated_subscription = Subscription::put_invoice(
+                    &self.pool,
+                    &stripe_subscription_id,
+                    &payed_at,
+                    &payed_until,
+                )
+                .await?;
 
-            self.send_updated_subscription(updated_subscription).await?;
+                self.send_updated_subscription(updated_subscription).await?;
+            }
         }
+
         Ok(HttpResponse::Ok().finish())
     }
 
