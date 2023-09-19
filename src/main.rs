@@ -38,9 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    // initialize event service
-    let event_service = EventService::new(db_pool, media_service);
-
     let cors_allowed_origins = get_env_var("CORS_ALLOWED_ORIGINS");
 
     tracing::log::info!("web server listening on {}", host);
@@ -48,12 +45,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     HttpServer::new(move || {
         let cors = get_cors(cors_allowed_origins.clone());
 
+        // initialize event service
+        let event_service =
+            EventService::new(db_pool.clone(), media_service.clone());
+
         App::new()
             .wrap(cors)
             .wrap(Logger::new(
                 "from: %{r}a %r %s %b %{Referer}i %{User-Agent}i",
             ))
-            .app_data(web::Data::new(event_service.clone()))
+            .app_data(web::Data::new(event_service))
             .configure(init_routes)
     })
     .workers(2)
