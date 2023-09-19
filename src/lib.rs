@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 
+mod app_settings;
 mod credentials;
 mod db;
 mod error;
@@ -10,6 +11,7 @@ mod routes;
 
 pub mod api;
 
+pub use app_settings::AppSettings;
 pub use credentials::CredentialsService;
 pub use db::{init_db_pool, migrate, DbError};
 pub use error::HttpError;

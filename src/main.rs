@@ -1,7 +1,8 @@
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
+
 use stripe_webhooks::{
-    get_cors, get_env_var, init_db_pool, init_routes, migrate,
+    get_cors, get_env_var, init_db_pool, init_routes, migrate, AppSettings,
     CredentialsService, EventService, MediaService,
 };
 
@@ -31,6 +32,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_env_var("SERVICE_USER_CLIENT_SECRET"),
     );
 
+    // get AppSettings
+    let app_settings = AppSettings::new(get_env_var("STRIPE_ENDPOINT_SECRET"));
+
     // initialize media service client
     let media_service = MediaService::init(
         get_env_var("MEDIA_SERVICE_URL"),
@@ -54,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .wrap(Logger::new(
                 "from: %{r}a %r %s %b %{Referer}i %{User-Agent}i",
             ))
+            .app_data(web::Data::new(app_settings.clone()))
             .app_data(web::Data::new(event_service))
             .configure(init_routes)
     })
