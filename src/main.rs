@@ -26,6 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // initialize credentials service
     let credentials_service = CredentialsService::new(
         get_env_var("OAUTH_URL"),
+        get_env_var("OAUTH_HOST"),
         get_env_var("SERVICE_USER_CLIENT_ID"),
         get_env_var("SERVICE_USER_CLIENT_SECRET"),
     );

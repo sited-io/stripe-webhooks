@@ -75,6 +75,10 @@ SERVICE_USER_CLIENT_SECRET='{{ .Data.data.SERVICE_USER_CLIENT_SECRET }}'
 {{ end }}
 
 OAUTH_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_zitadel" }}/oauth'
+{{ with nomadVar "nomad/jobs/" }}
+OAUTH_HOST='{{ .JWKS_HOST }}'
+{{ end }}
+
 CORS_ALLOWED_ORIGINS=""
 MEDIA_SERVICE_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_media-api" }}'
 EOF

@@ -20,6 +20,7 @@ struct Credential {
 #[derive(Debug, Clone)]
 pub struct CredentialsService {
     oauth_url: String,
+    oauth_host: String,
     client_id: String,
     client_secret: String,
     credential: RefCell<Credential>,
@@ -33,11 +34,13 @@ impl CredentialsService {
 
     pub fn new(
         oauth_url: String,
+        oauth_host: String,
         client_id: String,
         client_secret: String,
     ) -> Self {
         Self {
             oauth_url,
+            oauth_host,
             client_id,
             client_secret,
             credential: RefCell::new(Credential::default()),
@@ -53,7 +56,17 @@ impl CredentialsService {
     }
 
     async fn get_token(&self) -> Result<(), Status> {
-        let client = reqwest::Client::new();
+        //   adding host header in order to work in private network
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::HOST,
+            reqwest::header::HeaderValue::from_str(&self.oauth_host)
+                .map_err(|_| Status::internal(""))?,
+        );
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .map_err(|_| Status::internal(""))?;
 
         let now = Utc::now();
 
