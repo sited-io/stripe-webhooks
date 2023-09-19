@@ -49,7 +49,7 @@ impl MediaService {
 
         self.credentials_service
             .with_auth_header(&mut request)
-            .await;
+            .await?;
 
         client.put_media_subscription(request).await?;
 

@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use chrono::{DateTime, Duration, Utc};
 use reqwest::header::AUTHORIZATION;
 use serde::Deserialize;
-use tonic::Request;
+use tonic::{Request, Status};
 
 #[derive(Debug, Clone, Deserialize)]
 struct AuthResponse {
@@ -52,7 +52,7 @@ impl CredentialsService {
         format!("{}/v2/token", self.oauth_url)
     }
 
-    async fn get_token(&self) {
+    async fn get_token(&self) -> Result<(), Status> {
         let client = reqwest::Client::new();
 
         let now = Utc::now();
@@ -72,7 +72,7 @@ impl CredentialsService {
             }
             Err(err) => {
                 tracing::log::error!("[CredentialsService.get_token] {err}");
-                panic!()
+                return Err(Status::unauthenticated(""));
             }
         };
 
@@ -80,7 +80,7 @@ impl CredentialsService {
             Ok(auth_response) => auth_response,
             Err(err) => {
                 tracing::log::error!("[CredentialsService.get_token] {err}");
-                panic!()
+                return Err(Status::unauthenticated(""));
             }
         };
 
@@ -90,22 +90,29 @@ impl CredentialsService {
         };
 
         self.credential.replace(new_credentials);
+
+        Ok(())
     }
 
-    async fn ensure_fresh_token(&self) -> String {
+    async fn ensure_fresh_token(&self) -> Result<String, Status> {
         if self.is_expired() {
-            self.get_token().await;
+            self.get_token().await?;
         }
 
-        self.credential.borrow().access_token.to_owned()
+        Ok(self.credential.borrow().access_token.to_owned())
     }
 
-    pub async fn with_auth_header<T>(&self, request: &mut Request<T>) {
-        let token = self.ensure_fresh_token().await;
+    pub async fn with_auth_header<T>(
+        &self,
+        request: &mut Request<T>,
+    ) -> Result<(), Status> {
+        let token = self.ensure_fresh_token().await?;
         let header_value = format!("Bearer {}", token);
 
         request
             .metadata_mut()
             .insert(AUTHORIZATION.as_str(), header_value.parse().unwrap());
+
+        Ok(())
     }
 }
