@@ -1,7 +1,8 @@
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use stripe_webhooks::{
-    get_cors, get_env_var, init_db_pool, init_routes, migrate, EventService,
+    get_cors, get_env_var, init_db_pool, init_routes, migrate,
+    CredentialsService, EventService, MediaService,
 };
 
 #[actix_web::main]
@@ -11,8 +12,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // get required environment variables
     let host = get_env_var("HOST");
-
-    // let oauth_url = get_env_var("OAUTH_URL");
 
     // initialize database connection and migrate
     let db_pool = init_db_pool(
@@ -24,8 +23,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     migrate(&db_pool).await?;
 
+    // initialize credentials service
+    let credentials_service = CredentialsService::new(
+        get_env_var("OAUTH_URL"),
+        get_env_var("SERVICE_USER_CLIENT_ID"),
+        get_env_var("SERVICE_USER_CLIENT_SECRET"),
+    );
+
+    // initialize media service client
+    let media_service = MediaService::init(
+        get_env_var("MEDIA_SERVICE_URL"),
+        credentials_service,
+    )
+    .await?;
+
     // initialize event service
-    let event_service = EventService::new(db_pool);
+    let event_service = EventService::new(db_pool, media_service);
 
     let cors_allowed_origins = get_env_var("CORS_ALLOWED_ORIGINS");
 
@@ -42,6 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(web::Data::new(event_service.clone()))
             .configure(init_routes)
     })
+    .workers(2)
     .bind(host)
     .unwrap()
     .run()

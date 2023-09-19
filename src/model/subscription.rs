@@ -23,6 +23,7 @@ enum SubscriptionIden {
     UpdatedAt,
 }
 
+#[derive(Debug, Clone)]
 pub struct Subscription {
     pub subscription_id: Uuid,
     pub stripe_subscription_id: String,

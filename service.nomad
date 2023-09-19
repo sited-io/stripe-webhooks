@@ -26,6 +26,10 @@ job "stripe-webhooks" {
               destination_name = "cockroach-sql"
               local_bind_port  = 5432
             }
+            upstreams {
+              destination_name = "media-api"
+              local_bind_port  = 10000
+            }
           }
         }
       }
@@ -65,9 +69,14 @@ DB_USER='stripe_webhooks_user'
 DB_PASSWORD='{{ .Data.password }}'
 {{ end }}
 
-OAUTH_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_zitadel" }}/oauth'
+{{ with secret "kv2/data/services/stripe-webhooks" }}
+SERVICE_USER_CLIENT_ID='{{ .Data.data.SERVICE_USER_CLIENT_ID }}'
+SERVICE_USER_CLIENT_SECRET='{{ .Data.data.SERVICE_USER_CLIENT_SECRET }}'
+{{ end }}
 
+OAUTH_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_zitadel" }}/oauth'
 CORS_ALLOWED_ORIGINS=""
+MEDIA_SERVICE_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_media-api" }}'
 EOF
       }
 
