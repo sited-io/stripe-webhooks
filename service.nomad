@@ -86,8 +86,7 @@ EOF
       }
 
       config {
-        image      = "__IMAGE__"
-        force_pull = true
+        image = "__IMAGE__"
       }
     }
   }

@@ -21,8 +21,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_env_var("DB_USER"),
         get_env_var("DB_PASSWORD"),
         get_env_var("DB_DBNAME"),
-    )?;
-    migrate(&db_pool).await?;
+    )
+    .map_err(|err| {
+        tracing::log::error!(
+            "[main] Error while connecting to database: {:?}",
+            err
+        );
+        err
+    })?;
+
+    migrate(&db_pool).await.map_err(|err| {
+        tracing::log::error!(
+            "[main] Error while running migrations: {:?}",
+            err
+        );
+        err
+    })?;
 
     // initialize credentials service
     let credentials_service = CredentialsService::new(

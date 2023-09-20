@@ -85,22 +85,26 @@ impl From<DbError> for HttpError {
                             )
                         }
                         _ => {
-                            todo!("{err:?}")
+                            tracing::log::error!("{err:?}");
+                            HttpError::internal()
                         }
                     }
                 } else {
-                    tracing::log::error!("{:?}", tp_err);
+                    tracing::log::error!("{tp_err:?}");
                     HttpError::internal()
                 }
             }
             DbError::Pool(pool_err) => {
-                todo!("{pool_err:?}");
+                tracing::log::error!("{pool_err:?}");
+                HttpError::internal()
             }
             DbError::CreatePool(create_pool_err) => {
-                todo!("{create_pool_err:?}");
+                tracing::log::error!("{create_pool_err:?}");
+                HttpError::internal()
             }
             DbError::SeaQuery(sea_query_err) => {
-                todo!("{sea_query_err:?}");
+                tracing::log::error!("{sea_query_err:?}");
+                HttpError::internal()
             }
         }
     }
