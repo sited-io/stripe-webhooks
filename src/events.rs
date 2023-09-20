@@ -114,7 +114,7 @@ impl EventService {
             let updated_subscription = Subscription::put_checkout_session(
                 &self.pool,
                 &stripe_subscription_id,
-                &buyer_user_id,
+                buyer_user_id,
                 &offer_id,
             )
             .await?;

@@ -130,13 +130,26 @@ pub fn init_db_pool(
 }
 
 pub async fn migrate(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = pool.get().await?;
+    let mut client = pool.get().await.map_err(|err| {
+        tracing::log::error!(
+            "[migrate] Error while getting connection: {:?}",
+            err
+        );
+        err
+    })?;
 
     let runner = embedded::migrations::runner();
     runner
         .set_target(Target::Latest)
         .run_async(client.deref_mut().deref_mut())
-        .await?;
+        .await
+        .map_err(|err| {
+            tracing::log::error!(
+                "[migrate] Error while running migrations: {:?}",
+                err
+            );
+            err
+        })?;
 
     Ok(())
 }
