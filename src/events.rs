@@ -18,6 +18,7 @@ pub struct EventService {
 impl EventService {
     const METADATA_KEY_USER_ID: &str = "user_id";
     const METADATA_KEY_OFFER_ID: &str = "offer_id";
+    const METADATA_KEY_SHOP_ID: &str = "shop_id";
 
     pub fn new(pool: Pool, media_service: MediaService) -> Self {
         Self {
@@ -40,19 +41,29 @@ impl EventService {
     ) -> Result<(), HttpError> {
         let Subscription {
             subscription_id,
+            stripe_subscription_id,
             buyer_user_id,
             offer_id,
+            shop_id,
             current_period_start,
             current_period_end,
             subscription_status,
             payed_at,
             payed_until,
-            ..
+            created_at,
+            updated_at,
+            canceled_at,
         } = subscription;
+
+        // Noop: created_at and updated_at where destructured in order
+        //       to catch when the Subscription struct gets additional fields
+        #[allow(unused_variables, clippy::no_effect)]
+        (created_at, updated_at);
 
         if let (
             Some(buyer_user_id),
             Some(offer_id),
+            Some(shop_id),
             Some(current_period_start),
             Some(current_period_end),
             Some(subscription_status),
@@ -61,6 +72,7 @@ impl EventService {
         ) = (
             buyer_user_id,
             offer_id,
+            shop_id,
             current_period_start,
             current_period_end,
             subscription_status,
@@ -72,11 +84,14 @@ impl EventService {
                     subscription_id.to_string(),
                     buyer_user_id,
                     offer_id.to_string(),
+                    shop_id.to_string(),
                     current_period_start.timestamp().try_into().unwrap(),
                     current_period_end.timestamp().try_into().unwrap(),
                     subscription_status,
                     payed_at.timestamp().try_into().unwrap(),
                     payed_until.timestamp().try_into().unwrap(),
+                    Some(stripe_subscription_id),
+                    canceled_at.map(|c| c.timestamp().try_into().unwrap()),
                 )
                 .await
                 .map_err(|err| {
@@ -98,12 +113,17 @@ impl EventService {
             Some(stripe_subscription),
             Some(buyer_user_id),
             Some(offer_id),
+            Some(shop_id),
         ) = (
             checkout_session.subscription,
             checkout_session.metadata.get(Self::METADATA_KEY_USER_ID),
             checkout_session
                 .metadata
                 .get(Self::METADATA_KEY_OFFER_ID)
+                .and_then(|id| id.parse().ok()),
+            checkout_session
+                .metadata
+                .get(Self::METADATA_KEY_SHOP_ID)
                 .and_then(|id| id.parse().ok()),
         ) {
             let stripe_subscription_id = match stripe_subscription {
@@ -116,6 +136,7 @@ impl EventService {
                 &stripe_subscription_id,
                 buyer_user_id,
                 &offer_id,
+                &shop_id,
             )
             .await?;
 
@@ -141,12 +162,17 @@ impl EventService {
             DateTime::<Utc>::from_timestamp(subscription.current_period_end, 0)
                 .unwrap();
 
+        let canceled_at = subscription
+            .canceled_at
+            .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
+
         let updated_subscription = Subscription::put_subscription(
             &self.pool,
             &stripe_subscription_id,
             &current_period_start,
             &current_period_end,
             &subscription.status.to_string(),
+            canceled_at,
         )
         .await?;
 
@@ -216,7 +242,9 @@ impl EventService {
                     Err(Self::unexpected_object(&event))
                 }
             }
-            CustomerSubscriptionCreated | CustomerSubscriptionUpdated => {
+            CustomerSubscriptionCreated
+            | CustomerSubscriptionUpdated
+            | CustomerSubscriptionDeleted => {
                 if let EventObject::Subscription(subscription) =
                     event.data.object
                 {

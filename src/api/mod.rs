@@ -4,4 +4,10 @@ pub mod peoplesmarkets {
             include!("peoplesmarkets.media.v1.rs");
         }
     }
+
+    pub mod pagination {
+        pub mod v1 {
+            include!("peoplesmarkets.pagination.v1.rs");
+        }
+    }
 }

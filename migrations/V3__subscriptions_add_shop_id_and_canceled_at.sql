@@ -1,0 +1,6 @@
+ALTER TABLE
+  subscriptions
+ADD
+  COLUMN shop_id UUID,
+ADD
+  COLUMN canceled_at TIMESTAMP WITH TIME ZONE;

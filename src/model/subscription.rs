@@ -15,6 +15,7 @@ enum SubscriptionIden {
     StripeSubscriptionId,
     BuyerUserId,
     OfferId,
+    ShopId,
     CurrentPeriodStart,
     CurrentPeriodEnd,
     SubscriptionStatus,
@@ -22,6 +23,7 @@ enum SubscriptionIden {
     PayedUntil,
     CreatedAt,
     UpdatedAt,
+    CanceledAt,
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +32,7 @@ pub struct Subscription {
     pub stripe_subscription_id: String,
     pub buyer_user_id: Option<String>,
     pub offer_id: Option<Uuid>,
+    pub shop_id: Option<Uuid>,
     pub current_period_start: Option<DateTime<Utc>>,
     pub current_period_end: Option<DateTime<Utc>>,
     pub subscription_status: Option<String>,
@@ -37,20 +40,23 @@ pub struct Subscription {
     pub payed_until: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub canceled_at: Option<DateTime<Utc>>,
 }
 
 impl Subscription {
-    const PUT_CHECKOUT_SESSION_COLUMNS: [SubscriptionIden; 3] = [
+    const PUT_CHECKOUT_SESSION_COLUMNS: [SubscriptionIden; 4] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::BuyerUserId,
         SubscriptionIden::OfferId,
+        SubscriptionIden::ShopId,
     ];
 
-    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 4] = [
+    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 5] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::CurrentPeriodStart,
         SubscriptionIden::CurrentPeriodEnd,
         SubscriptionIden::SubscriptionStatus,
+        SubscriptionIden::CanceledAt,
     ];
 
     const PUT_INVOICE_COLUMNS: [SubscriptionIden; 3] = [
@@ -64,6 +70,7 @@ impl Subscription {
         stripe_subscription_id: &String,
         buyer_user_id: &String,
         offer_id: &Uuid,
+        shop_id: &Uuid,
     ) -> Result<Self, DbError> {
         let conn = pool.get().await?;
 
@@ -74,6 +81,7 @@ impl Subscription {
                 stripe_subscription_id.into(),
                 buyer_user_id.into(),
                 (*offer_id).into(),
+                (*shop_id).into(),
             ])?
             .on_conflict(
                 OnConflict::column(SubscriptionIden::StripeSubscriptionId)
@@ -94,6 +102,7 @@ impl Subscription {
         current_period_start: &DateTime<Utc>,
         current_period_end: &DateTime<Utc>,
         subscription_status: &String,
+        canceled_at: Option<DateTime<Utc>>,
     ) -> Result<Self, DbError> {
         let conn = pool.get().await?;
 
@@ -105,6 +114,7 @@ impl Subscription {
                 (*current_period_start).into(),
                 (*current_period_end).into(),
                 subscription_status.into(),
+                canceled_at.into(),
             ])?
             .on_conflict(
                 OnConflict::column(SubscriptionIden::StripeSubscriptionId)
@@ -160,6 +170,7 @@ impl From<Row> for Subscription {
             buyer_user_id: row
                 .get(SubscriptionIden::BuyerUserId.to_string().as_str()),
             offer_id: row.get(SubscriptionIden::OfferId.to_string().as_str()),
+            shop_id: row.get(SubscriptionIden::ShopId.to_string().as_str()),
             current_period_start: row
                 .get(SubscriptionIden::CurrentPeriodStart.to_string().as_str()),
             current_period_end: row
@@ -173,6 +184,8 @@ impl From<Row> for Subscription {
                 .get(SubscriptionIden::CreatedAt.to_string().as_str()),
             updated_at: row
                 .get(SubscriptionIden::UpdatedAt.to_string().as_str()),
+            canceled_at: row
+                .get(SubscriptionIden::CanceledAt.to_string().as_str()),
         }
     }
 }

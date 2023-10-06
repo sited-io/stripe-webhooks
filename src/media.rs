@@ -25,16 +25,20 @@ impl MediaService {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn put_media_subscription(
         &self,
         media_subscription_id: String,
         buyer_user_id: String,
         offer_id: String,
+        shop_id: String,
         current_period_start: u64,
         current_period_end: u64,
         subscription_status: String,
         payed_at: u64,
         payed_until: u64,
+        stripe_subscription_id: Option<String>,
+        canceled_at: Option<u64>,
     ) -> Result<(), Status> {
         let mut client = self.media_subscription_client.clone();
 
@@ -42,11 +46,14 @@ impl MediaService {
             media_subscription_id,
             buyer_user_id,
             offer_id,
+            shop_id,
             current_period_start,
             current_period_end,
             subscription_status,
             payed_at,
             payed_until,
+            stripe_subscription_id,
+            canceled_at,
         });
 
         self.credentials_service
