@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use deadpool_postgres::tokio_postgres::Row;
-use deadpool_postgres::Pool;
-use sea_query::{Iden, OnConflict, PostgresQueryBuilder, Query};
+use deadpool_postgres::{GenericClient, Transaction};
+use sea_query::{
+    Asterisk, Expr, Iden, OnConflict, PostgresQueryBuilder, Query,
+};
 use sea_query_postgres::PostgresBinder;
 use uuid::Uuid;
 
@@ -24,6 +26,7 @@ enum SubscriptionIden {
     CreatedAt,
     UpdatedAt,
     CanceledAt,
+    EventTimestamp,
 }
 
 #[derive(Debug, Clone)]
@@ -41,39 +44,60 @@ pub struct Subscription {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub canceled_at: Option<DateTime<Utc>>,
+    pub event_timestamp: i64,
 }
 
 impl Subscription {
-    const PUT_CHECKOUT_SESSION_COLUMNS: [SubscriptionIden; 4] = [
+    const PUT_CHECKOUT_SESSION_COLUMNS: [SubscriptionIden; 5] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::BuyerUserId,
         SubscriptionIden::OfferId,
         SubscriptionIden::ShopId,
+        SubscriptionIden::EventTimestamp,
     ];
 
-    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 5] = [
+    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 6] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::CurrentPeriodStart,
         SubscriptionIden::CurrentPeriodEnd,
         SubscriptionIden::SubscriptionStatus,
         SubscriptionIden::CanceledAt,
+        SubscriptionIden::EventTimestamp,
     ];
 
-    const PUT_INVOICE_COLUMNS: [SubscriptionIden; 3] = [
+    const PUT_INVOICE_COLUMNS: [SubscriptionIden; 4] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::PayedAt,
         SubscriptionIden::PayedUntil,
+        SubscriptionIden::EventTimestamp,
     ];
 
-    pub async fn put_checkout_session(
-        pool: &Pool,
+    pub async fn get<'a>(
+        conn: &Transaction<'a>,
+        stripe_subscription_id: &String,
+    ) -> Result<Option<Self>, DbError> {
+        let (sql, values) = Query::select()
+            .column(Asterisk)
+            .from(SubscriptionIden::Table)
+            .and_where(
+                Expr::col(SubscriptionIden::StripeSubscriptionId)
+                    .eq(stripe_subscription_id),
+            )
+            .build_postgres(PostgresQueryBuilder);
+
+        let row = conn.query_opt(sql.as_str(), &values.as_params()).await?;
+
+        Ok(row.map(Self::from))
+    }
+
+    pub async fn put_checkout_session<'a>(
+        conn: &Transaction<'a>,
         stripe_subscription_id: &String,
         buyer_user_id: &String,
         offer_id: &Uuid,
         shop_id: &Uuid,
+        event_timestamp: i64,
     ) -> Result<Self, DbError> {
-        let conn = pool.get().await?;
-
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
             .columns(Self::PUT_CHECKOUT_SESSION_COLUMNS)
@@ -82,6 +106,7 @@ impl Subscription {
                 buyer_user_id.into(),
                 (*offer_id).into(),
                 (*shop_id).into(),
+                event_timestamp.into(),
             ])?
             .on_conflict(
                 OnConflict::column(SubscriptionIden::StripeSubscriptionId)
@@ -96,16 +121,15 @@ impl Subscription {
         Ok(Self::from(row))
     }
 
-    pub async fn put_subscription(
-        pool: &Pool,
+    pub async fn put_subscription<'a>(
+        conn: &Transaction<'a>,
         stripe_subscription_id: &String,
         current_period_start: &DateTime<Utc>,
         current_period_end: &DateTime<Utc>,
         subscription_status: &String,
         canceled_at: Option<DateTime<Utc>>,
+        event_timestamp: i64,
     ) -> Result<Self, DbError> {
-        let conn = pool.get().await?;
-
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
             .columns(Self::PUT_SUBSCRIPTION_COLUMNS)
@@ -115,6 +139,7 @@ impl Subscription {
                 (*current_period_end).into(),
                 subscription_status.into(),
                 canceled_at.into(),
+                event_timestamp.into(),
             ])?
             .on_conflict(
                 OnConflict::column(SubscriptionIden::StripeSubscriptionId)
@@ -129,14 +154,13 @@ impl Subscription {
         Ok(Self::from(row))
     }
 
-    pub async fn put_invoice(
-        pool: &Pool,
+    pub async fn put_invoice<'a>(
+        conn: &Transaction<'a>,
         stripe_subscription_id: &String,
         payed_at: &DateTime<Utc>,
         payed_until: &DateTime<Utc>,
+        event_timestamp: i64,
     ) -> Result<Self, DbError> {
-        let conn = pool.get().await?;
-
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
             .columns(Self::PUT_INVOICE_COLUMNS)
@@ -144,6 +168,7 @@ impl Subscription {
                 stripe_subscription_id.into(),
                 (*payed_at).into(),
                 (*payed_until).into(),
+                event_timestamp.into(),
             ])?
             .on_conflict(
                 OnConflict::column(SubscriptionIden::StripeSubscriptionId)
@@ -186,6 +211,8 @@ impl From<Row> for Subscription {
                 .get(SubscriptionIden::UpdatedAt.to_string().as_str()),
             canceled_at: row
                 .get(SubscriptionIden::CanceledAt.to_string().as_str()),
+            event_timestamp: row
+                .get(SubscriptionIden::EventTimestamp.to_string().as_str()),
         }
     }
 }

@@ -7,7 +7,7 @@ use stripe::{
 };
 
 use crate::model::Subscription;
-use crate::{HttpError, MediaService};
+use crate::{DbError, HttpError, MediaService};
 
 #[derive(Debug, Clone)]
 pub struct EventService {
@@ -53,12 +53,13 @@ impl EventService {
             created_at,
             updated_at,
             canceled_at,
+            event_timestamp,
         } = subscription;
 
-        // Noop: created_at and updated_at where destructured in order
-        //       to catch when the Subscription struct gets additional fields
+        // Noop: these fields where destructured so that cargo can
+        // catch when the Subscription struct gets additional fields
         #[allow(unused_variables, clippy::no_effect)]
-        (created_at, updated_at);
+        (created_at, updated_at, event_timestamp);
 
         if let (
             Some(buyer_user_id),
@@ -131,14 +132,21 @@ impl EventService {
                 Expandable::Object(s) => s.id.to_string(),
             };
 
+            let mut conn = self.pool.get().await.map_err(DbError::from)?;
+            let transaction =
+                conn.transaction().await.map_err(DbError::from)?;
+
             let updated_subscription = Subscription::put_checkout_session(
-                &self.pool,
+                &transaction,
                 &stripe_subscription_id,
                 buyer_user_id,
                 &offer_id,
                 &shop_id,
+                checkout_session.created,
             )
             .await?;
+
+            transaction.commit().await.map_err(DbError::from)?;
 
             self.send_updated_subscription(updated_subscription).await?;
         }
@@ -166,17 +174,31 @@ impl EventService {
             .canceled_at
             .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
 
-        let updated_subscription = Subscription::put_subscription(
-            &self.pool,
-            &stripe_subscription_id,
-            &current_period_start,
-            &current_period_end,
-            &subscription.status.to_string(),
-            canceled_at,
-        )
-        .await?;
+        let mut conn = self.pool.get().await.map_err(DbError::from)?;
+        let transaction = conn.transaction().await.map_err(DbError::from)?;
 
-        self.send_updated_subscription(updated_subscription).await?;
+        if let Some(existing_subscription) =
+            Subscription::get(&transaction, &stripe_subscription_id).await?
+        {
+            if existing_subscription.subscription_status.is_none()
+                || existing_subscription.event_timestamp < subscription.created
+            {
+                let updated_subscription = Subscription::put_subscription(
+                    &transaction,
+                    &stripe_subscription_id,
+                    &current_period_start,
+                    &current_period_end,
+                    &subscription.status.to_string(),
+                    canceled_at,
+                    subscription.created,
+                )
+                .await?;
+
+                self.send_updated_subscription(updated_subscription).await?;
+            }
+        }
+
+        transaction.commit().await.map_err(DbError::from)?;
 
         Ok(HttpResponse::Ok().finish())
     }
@@ -185,6 +207,9 @@ impl EventService {
         &self,
         invoice: Invoice,
     ) -> Result<HttpResponse, HttpError> {
+        let mut conn = self.pool.get().await.map_err(DbError::from)?;
+        let transaction = conn.transaction().await.map_err(DbError::from)?;
+
         for line in invoice.lines.data {
             if let Some(stripe_subscription) = line.subscription {
                 let stripe_subscription_id =
@@ -212,16 +237,19 @@ impl EventService {
                 };
 
                 let updated_subscription = Subscription::put_invoice(
-                    &self.pool,
+                    &transaction,
                     &stripe_subscription_id,
                     &payed_at,
                     &payed_until,
+                    invoice.created.unwrap_or(0),
                 )
                 .await?;
 
                 self.send_updated_subscription(updated_subscription).await?;
             }
         }
+
+        transaction.commit().await.map_err(DbError::from)?;
 
         Ok(HttpResponse::Ok().finish())
     }
