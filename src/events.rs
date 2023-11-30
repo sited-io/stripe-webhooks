@@ -101,6 +101,8 @@ impl EventService {
                     );
                     HttpError::internal()
                 })?;
+
+            tracing::info!("[EventService.send_updated_subscription] Sucessfully sent subscription to media api");
         }
 
         Ok(())
