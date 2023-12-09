@@ -159,6 +159,7 @@ impl EventService {
     async fn handle_subscription(
         &self,
         subscription: StripeSubscription,
+        created: i64,
     ) -> Result<HttpResponse, HttpError> {
         let stripe_subscription_id = subscription.id.to_string();
 
@@ -182,9 +183,7 @@ impl EventService {
         if let Some(existing_subscription) =
             Subscription::get(&transaction, &stripe_subscription_id).await?
         {
-            if existing_subscription.subscription_status.is_none()
-                || existing_subscription.event_timestamp < subscription.created
-            {
+            if existing_subscription.event_timestamp < created {
                 let updated_subscription = Subscription::put_subscription(
                     &transaction,
                     &stripe_subscription_id,
@@ -283,7 +282,7 @@ impl EventService {
                 if let EventObject::Subscription(subscription) =
                     event.data.object
                 {
-                    self.handle_subscription(subscription).await
+                    self.handle_subscription(subscription, event.created).await
                 } else {
                     Err(Self::unexpected_object(&event))
                 }
