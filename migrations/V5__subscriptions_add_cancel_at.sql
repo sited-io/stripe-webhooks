@@ -1,0 +1,4 @@
+ALTER TABLE
+  subscriptions
+ADD
+  COLUMN cancel_at TIMESTAMP WITH TIME ZONE;

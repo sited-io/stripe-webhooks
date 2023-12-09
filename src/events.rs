@@ -53,6 +53,7 @@ impl EventService {
             created_at,
             updated_at,
             canceled_at,
+            cancel_at,
             event_timestamp,
         } = subscription;
 
@@ -93,6 +94,7 @@ impl EventService {
                     payed_until.timestamp().try_into().unwrap(),
                     Some(stripe_subscription_id),
                     canceled_at.map(|c| c.timestamp().try_into().unwrap()),
+                    cancel_at.map(|c| c.timestamp().try_into().unwrap()),
                 )
                 .await
                 .map_err(|err| {
@@ -176,6 +178,9 @@ impl EventService {
         let canceled_at = subscription
             .canceled_at
             .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
+        let cancel_at = subscription
+            .cancel_at
+            .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
 
         let mut conn = self.pool.get().await.map_err(DbError::from)?;
         let transaction = conn.transaction().await.map_err(DbError::from)?;
@@ -191,6 +196,7 @@ impl EventService {
                     &current_period_end,
                     &subscription.status.to_string(),
                     canceled_at,
+                    cancel_at,
                     subscription.created,
                 )
                 .await?;

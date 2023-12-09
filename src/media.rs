@@ -39,6 +39,7 @@ impl MediaService {
         payed_until: u64,
         stripe_subscription_id: Option<String>,
         canceled_at: Option<u64>,
+        cancel_at: Option<u64>,
     ) -> Result<(), Status> {
         let mut client = self.media_subscription_client.clone();
 
@@ -54,6 +55,7 @@ impl MediaService {
             payed_until,
             stripe_subscription_id,
             canceled_at,
+            cancel_at,
         });
 
         self.credentials_service

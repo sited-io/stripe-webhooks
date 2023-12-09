@@ -23,6 +23,8 @@ pub struct MediaSubscriptionResponse {
     pub stripe_subscription_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint64, optional, tag = "12")]
     pub canceled_at: ::core::option::Option<u64>,
+    #[prost(uint64, optional, tag = "13")]
+    pub cancel_at: ::core::option::Option<u64>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -49,6 +51,8 @@ pub struct PutMediaSubscriptionRequest {
     pub stripe_subscription_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint64, optional, tag = "11")]
     pub canceled_at: ::core::option::Option<u64>,
+    #[prost(uint64, optional, tag = "12")]
+    pub cancel_at: ::core::option::Option<u64>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

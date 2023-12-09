@@ -26,6 +26,7 @@ enum SubscriptionIden {
     CreatedAt,
     UpdatedAt,
     CanceledAt,
+    CancelAt,
     EventTimestamp,
 }
 
@@ -44,6 +45,7 @@ pub struct Subscription {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub canceled_at: Option<DateTime<Utc>>,
+    pub cancel_at: Option<DateTime<Utc>>,
     pub event_timestamp: i64,
 }
 
@@ -56,12 +58,13 @@ impl Subscription {
         SubscriptionIden::EventTimestamp,
     ];
 
-    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 6] = [
+    const PUT_SUBSCRIPTION_COLUMNS: [SubscriptionIden; 7] = [
         SubscriptionIden::StripeSubscriptionId,
         SubscriptionIden::CurrentPeriodStart,
         SubscriptionIden::CurrentPeriodEnd,
         SubscriptionIden::SubscriptionStatus,
         SubscriptionIden::CanceledAt,
+        SubscriptionIden::CancelAt,
         SubscriptionIden::EventTimestamp,
     ];
 
@@ -121,6 +124,7 @@ impl Subscription {
         Ok(Self::from(row))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn put_subscription<'a>(
         conn: &Transaction<'a>,
         stripe_subscription_id: &String,
@@ -128,6 +132,7 @@ impl Subscription {
         current_period_end: &DateTime<Utc>,
         subscription_status: &String,
         canceled_at: Option<DateTime<Utc>>,
+        cancel_at: Option<DateTime<Utc>>,
         event_timestamp: i64,
     ) -> Result<Self, DbError> {
         let (sql, values) = Query::insert()
@@ -139,6 +144,7 @@ impl Subscription {
                 (*current_period_end).into(),
                 subscription_status.into(),
                 canceled_at.into(),
+                cancel_at.into(),
                 event_timestamp.into(),
             ])?
             .on_conflict(
@@ -211,6 +217,7 @@ impl From<Row> for Subscription {
                 .get(SubscriptionIden::UpdatedAt.to_string().as_str()),
             canceled_at: row
                 .get(SubscriptionIden::CanceledAt.to_string().as_str()),
+            cancel_at: row.get(SubscriptionIden::CancelAt.to_string().as_str()),
             event_timestamp: row
                 .get(SubscriptionIden::EventTimestamp.to_string().as_str()),
         }
