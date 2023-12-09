@@ -272,9 +272,14 @@ impl EventService {
                     Err(Self::unexpected_object(&event))
                 }
             }
-            CustomerSubscriptionCreated
-            | CustomerSubscriptionUpdated
-            | CustomerSubscriptionDeleted => {
+            CustomerSubscriptionResumed
+            | CustomerSubscriptionPendingUpdateExpired
+            | CustomerSubscriptionPendingUpdateApplied
+            | CustomerSubscriptionPaused
+            | CustomerSubscriptionDeleted
+            | CustomerSubscriptionTrialWillEnd
+            | CustomerSubscriptionCreated
+            | CustomerSubscriptionUpdated => {
                 if let EventObject::Subscription(subscription) =
                     event.data.object
                 {
