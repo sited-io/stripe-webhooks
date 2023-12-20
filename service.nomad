@@ -47,7 +47,7 @@ job "stripe-webhooks" {
       driver = "docker"
 
       resources {
-        cpu        = 100
+        cpu        = 200
         memory     = 256
         memory_max = 256
       }

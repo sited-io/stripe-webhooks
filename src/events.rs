@@ -165,44 +165,48 @@ impl EventService {
     ) -> Result<HttpResponse, HttpError> {
         let stripe_subscription_id = subscription.id.to_string();
 
-        let current_period_start = DateTime::<Utc>::from_timestamp(
-            subscription.current_period_start,
-            0,
-        )
-        .unwrap();
-
-        let current_period_end =
-            DateTime::<Utc>::from_timestamp(subscription.current_period_end, 0)
-                .unwrap();
-
-        let canceled_at = subscription
-            .canceled_at
-            .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
-        let cancel_at = subscription
-            .cancel_at
-            .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
-
         let mut conn = self.pool.get().await.map_err(DbError::from)?;
         let transaction = conn.transaction().await.map_err(DbError::from)?;
 
-        if let Some(existing_subscription) =
-            Subscription::get(&transaction, &stripe_subscription_id).await?
-        {
-            if existing_subscription.event_timestamp < created {
-                let updated_subscription = Subscription::put_subscription(
-                    &transaction,
-                    &stripe_subscription_id,
-                    &current_period_start,
-                    &current_period_end,
-                    &subscription.status.to_string(),
-                    canceled_at,
-                    cancel_at,
-                    subscription.created,
-                )
-                .await?;
+        let found_subscription =
+            Subscription::get(&transaction, &stripe_subscription_id).await?;
 
-                self.send_updated_subscription(updated_subscription).await?;
-            }
+        if found_subscription.is_none()
+            || found_subscription.is_some_and(|f| f.event_timestamp < created)
+        {
+            let current_period_start = DateTime::<Utc>::from_timestamp(
+                subscription.current_period_start,
+                0,
+            )
+            .unwrap();
+
+            let current_period_end = DateTime::<Utc>::from_timestamp(
+                subscription.current_period_end,
+                0,
+            )
+            .unwrap();
+
+            let canceled_at = subscription
+                .canceled_at
+                .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
+
+            let cancel_at = subscription
+                .cancel_at
+                .and_then(|c| DateTime::<Utc>::from_timestamp(c, 0));
+
+            let updated_subscription = Subscription::put_subscription(
+                &transaction,
+                &stripe_subscription_id,
+                &current_period_start,
+                &current_period_end,
+                &subscription.status.to_string(),
+                canceled_at,
+                cancel_at,
+                subscription.created,
+            )
+            .await?;
+
+            self.send_updated_subscription(updated_subscription).await?;
         }
 
         transaction.commit().await.map_err(DbError::from)?;
