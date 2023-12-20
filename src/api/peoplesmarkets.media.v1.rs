@@ -78,6 +78,8 @@ pub struct ListMediaSubscriptionsRequest {
     pub shop_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "2")]
     pub pagination: ::core::option::Option<super::super::pagination::v1::Pagination>,
+    #[prost(bool, optional, tag = "3")]
+    pub is_accessible: ::core::option::Option<bool>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
