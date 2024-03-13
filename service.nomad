@@ -3,7 +3,7 @@ job "stripe-webhooks" {
   type        = "service"
 
   group "stripe-webhooks-api" {
-    count = 2
+    count = 1
 
     network {
       mode = "bridge"
