@@ -1,4 +1,4 @@
-# Payment service for peoplesmarkets.com
+# Payment service for sited.io
 
 ## Prerequesites
 
@@ -36,10 +36,10 @@ export DB_USER='payment_user'
 export DB_PASSWORD=''
 export DB_DBNAME='payment'
 
-export JWKS_URL='https://auth-dev.peoplesmarkets.com/oauth/v2/keys'
-export JWKS_HOST='auth-dev.peoplesmarkets.com'
+export JWKS_URL='https://auth-dev.sited.io/oauth/v2/keys'
+export JWKS_HOST='auth-dev.sited.io'
 
-export COMMERCE_SERVICE_URL='https://grpc-dev.peoplesmarkets.com:443'
+export COMMERCE_SERVICE_URL='https://grpc-dev.sited.io:443'
 
 export STRIPE_SECRET_KEY="xxxx"
 ```

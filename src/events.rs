@@ -16,9 +16,9 @@ pub struct EventService {
 }
 
 impl EventService {
-    const METADATA_KEY_USER_ID: &str = "user_id";
-    const METADATA_KEY_OFFER_ID: &str = "offer_id";
-    const METADATA_KEY_SHOP_ID: &str = "shop_id";
+    const METADATA_KEY_USER_ID: &'static str = "user_id";
+    const METADATA_KEY_OFFER_ID: &'static str = "offer_id";
+    const METADATA_KEY_SHOP_ID: &'static str = "shop_id";
 
     pub fn new(pool: Pool, media_service: MediaService) -> Self {
         Self {

@@ -21,6 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_env_var("DB_USER"),
         get_env_var("DB_PASSWORD"),
         get_env_var("DB_DBNAME"),
+        std::env::var("DB_ROOT_CERT").ok(),
     )?;
 
     migrate(&db_pool).await?;

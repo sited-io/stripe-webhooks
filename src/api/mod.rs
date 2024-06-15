@@ -1,13 +1,13 @@
-pub mod peoplesmarkets {
+pub mod sited_io {
     pub mod media {
         pub mod v1 {
-            include!("peoplesmarkets.media.v1.rs");
+            include!("sited_io.media.v1.rs");
         }
     }
 
     pub mod pagination {
         pub mod v1 {
-            include!("peoplesmarkets.pagination.v1.rs");
+            include!("sited_io.pagination.v1.rs");
         }
     }
 }

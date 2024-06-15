@@ -2,3 +2,5 @@
 /target
 run.sh
 .vscode/
+.env*
+stripe-webhooks.service

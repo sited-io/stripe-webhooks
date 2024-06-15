@@ -77,7 +77,9 @@ pub struct ListMediaSubscriptionsRequest {
     #[prost(string, optional, tag = "1")]
     pub shop_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "2")]
-    pub pagination: ::core::option::Option<super::super::pagination::v1::Pagination>,
+    pub pagination: ::core::option::Option<
+        super::super::pagination::v1::PaginationRequest,
+    >,
     #[prost(bool, optional, tag = "3")]
     pub is_accessible: ::core::option::Option<bool>,
 }
@@ -87,7 +89,9 @@ pub struct ListMediaSubscriptionsResponse {
     #[prost(message, repeated, tag = "1")]
     pub media_subscriptions: ::prost::alloc::vec::Vec<MediaSubscriptionResponse>,
     #[prost(message, optional, tag = "2")]
-    pub pagination: ::core::option::Option<super::super::pagination::v1::Pagination>,
+    pub pagination: ::core::option::Option<
+        super::super::pagination::v1::PaginationResponse,
+    >,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -212,13 +216,13 @@ pub mod media_subscription_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/peoplesmarkets.media.v1.MediaSubscriptionService/PutMediaSubscription",
+                "/sited_io.media.v1.MediaSubscriptionService/PutMediaSubscription",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "peoplesmarkets.media.v1.MediaSubscriptionService",
+                        "sited_io.media.v1.MediaSubscriptionService",
                         "PutMediaSubscription",
                     ),
                 );
@@ -242,13 +246,13 @@ pub mod media_subscription_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/peoplesmarkets.media.v1.MediaSubscriptionService/GetMediaSubscription",
+                "/sited_io.media.v1.MediaSubscriptionService/GetMediaSubscription",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "peoplesmarkets.media.v1.MediaSubscriptionService",
+                        "sited_io.media.v1.MediaSubscriptionService",
                         "GetMediaSubscription",
                     ),
                 );
@@ -272,13 +276,13 @@ pub mod media_subscription_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/peoplesmarkets.media.v1.MediaSubscriptionService/ListMediaSubscriptions",
+                "/sited_io.media.v1.MediaSubscriptionService/ListMediaSubscriptions",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "peoplesmarkets.media.v1.MediaSubscriptionService",
+                        "sited_io.media.v1.MediaSubscriptionService",
                         "ListMediaSubscriptions",
                     ),
                 );
@@ -302,13 +306,13 @@ pub mod media_subscription_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/peoplesmarkets.media.v1.MediaSubscriptionService/CancelMediaSubscription",
+                "/sited_io.media.v1.MediaSubscriptionService/CancelMediaSubscription",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "peoplesmarkets.media.v1.MediaSubscriptionService",
+                        "sited_io.media.v1.MediaSubscriptionService",
                         "CancelMediaSubscription",
                     ),
                 );
@@ -332,13 +336,13 @@ pub mod media_subscription_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/peoplesmarkets.media.v1.MediaSubscriptionService/ResumeMediaSubscription",
+                "/sited_io.media.v1.MediaSubscriptionService/ResumeMediaSubscription",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "peoplesmarkets.media.v1.MediaSubscriptionService",
+                        "sited_io.media.v1.MediaSubscriptionService",
                         "ResumeMediaSubscription",
                     ),
                 );

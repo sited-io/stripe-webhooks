@@ -1,8 +1,8 @@
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 
-use crate::api::peoplesmarkets::media::v1::media_subscription_service_client::MediaSubscriptionServiceClient;
-use crate::api::peoplesmarkets::media::v1::PutMediaSubscriptionRequest;
+use crate::api::sited_io::media::v1::media_subscription_service_client::MediaSubscriptionServiceClient;
+use crate::api::sited_io::media::v1::PutMediaSubscriptionRequest;
 use crate::CredentialsService;
 
 #[derive(Debug, Clone)]
