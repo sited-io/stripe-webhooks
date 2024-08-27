@@ -114,45 +114,41 @@ impl EventService {
         &self,
         checkout_session: CheckoutSession,
     ) -> Result<HttpResponse, HttpError> {
-        if let (
-            Some(stripe_subscription),
-            Some(buyer_user_id),
-            Some(offer_id),
-            Some(shop_id),
-        ) = (
-            checkout_session.subscription,
-            checkout_session.metadata.get(Self::METADATA_KEY_USER_ID),
-            checkout_session
-                .metadata
-                .get(Self::METADATA_KEY_OFFER_ID)
-                .and_then(|id| id.parse().ok()),
-            checkout_session
-                .metadata
-                .get(Self::METADATA_KEY_SHOP_ID)
-                .and_then(|id| id.parse().ok()),
-        ) {
-            let stripe_subscription_id = match stripe_subscription {
-                Expandable::Id(id) => id.to_string(),
-                Expandable::Object(s) => s.id.to_string(),
-            };
+        if let (Some(stripe_subscription), Some(metadata)) =
+            (checkout_session.subscription, checkout_session.metadata)
+        {
+            if let (Some(buyer_user_id), Some(offer_id), Some(shop_id)) = (
+                metadata.get(Self::METADATA_KEY_USER_ID),
+                metadata
+                    .get(Self::METADATA_KEY_OFFER_ID)
+                    .and_then(|id| id.parse().ok()),
+                metadata
+                    .get(Self::METADATA_KEY_SHOP_ID)
+                    .and_then(|id| id.parse().ok()),
+            ) {
+                let stripe_subscription_id = match stripe_subscription {
+                    Expandable::Id(id) => id.to_string(),
+                    Expandable::Object(s) => s.id.to_string(),
+                };
 
-            let mut conn = self.pool.get().await.map_err(DbError::from)?;
-            let transaction =
-                conn.transaction().await.map_err(DbError::from)?;
+                let mut conn = self.pool.get().await.map_err(DbError::from)?;
+                let transaction =
+                    conn.transaction().await.map_err(DbError::from)?;
 
-            let updated_subscription = Subscription::put_checkout_session(
-                &transaction,
-                &stripe_subscription_id,
-                buyer_user_id,
-                &offer_id,
-                &shop_id,
-                checkout_session.created,
-            )
-            .await?;
+                let updated_subscription = Subscription::put_checkout_session(
+                    &transaction,
+                    &stripe_subscription_id,
+                    buyer_user_id,
+                    &offer_id,
+                    &shop_id,
+                    checkout_session.created,
+                )
+                .await?;
 
-            transaction.commit().await.map_err(DbError::from)?;
+                transaction.commit().await.map_err(DbError::from)?;
 
-            self.send_updated_subscription(updated_subscription).await?;
+                self.send_updated_subscription(updated_subscription).await?;
+            }
         }
 
         Ok(HttpResponse::Ok().finish())
@@ -218,49 +214,53 @@ impl EventService {
         &self,
         invoice: Invoice,
     ) -> Result<HttpResponse, HttpError> {
-        let mut conn = self.pool.get().await.map_err(DbError::from)?;
-        let transaction = conn.transaction().await.map_err(DbError::from)?;
+        if let Some(lines) = invoice.lines {
+            let mut conn = self.pool.get().await.map_err(DbError::from)?;
+            let transaction =
+                conn.transaction().await.map_err(DbError::from)?;
 
-        for line in invoice.lines.data {
-            if let Some(stripe_subscription) = line.subscription {
-                let stripe_subscription_id =
-                    stripe_subscription.id().to_string();
+            for line in lines.data {
+                if let Some(stripe_subscription) = line.subscription {
+                    let stripe_subscription_id =
+                        stripe_subscription.id().to_string();
 
-                let payed_at = if let Some(payed_at) = line
-                    .period
-                    .as_ref()
-                    .and_then(|p| p.start)
-                    .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
-                {
-                    payed_at
-                } else {
-                    return Ok(HttpResponse::Ok().finish());
-                };
+                    let payed_at = if let Some(payed_at) = line
+                        .period
+                        .as_ref()
+                        .and_then(|p| p.start)
+                        .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+                    {
+                        payed_at
+                    } else {
+                        return Ok(HttpResponse::Ok().finish());
+                    };
 
-                let payed_until = if let Some(payed_until) = line
-                    .period
-                    .and_then(|p| p.end)
-                    .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
-                {
-                    payed_until
-                } else {
-                    return Ok(HttpResponse::Ok().finish());
-                };
+                    let payed_until = if let Some(payed_until) = line
+                        .period
+                        .and_then(|p| p.end)
+                        .and_then(|p| DateTime::<Utc>::from_timestamp(p, 0))
+                    {
+                        payed_until
+                    } else {
+                        return Ok(HttpResponse::Ok().finish());
+                    };
 
-                let updated_subscription = Subscription::put_invoice(
-                    &transaction,
-                    &stripe_subscription_id,
-                    &payed_at,
-                    &payed_until,
-                    invoice.created.unwrap_or(0),
-                )
-                .await?;
+                    let updated_subscription = Subscription::put_invoice(
+                        &transaction,
+                        &stripe_subscription_id,
+                        &payed_at,
+                        &payed_until,
+                        invoice.created.unwrap_or(0),
+                    )
+                    .await?;
 
-                self.send_updated_subscription(updated_subscription).await?;
+                    self.send_updated_subscription(updated_subscription)
+                        .await?;
+                }
             }
-        }
 
-        transaction.commit().await.map_err(DbError::from)?;
+            transaction.commit().await.map_err(DbError::from)?;
+        }
 
         Ok(HttpResponse::Ok().finish())
     }
