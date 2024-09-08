@@ -8,6 +8,7 @@ actix-cors = { version = "0.7.0", default-features = false }
 actix-web = { version = "4.9.0", default-features = false, features = [
   "macros",
 ] }
+async-nats = "0.36.0"
 async-stripe = { version = "0.39.1", features = ["runtime-tokio-hyper"] }
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 deadpool-postgres = { version = "0.14.0", default-features = false, features = [

@@ -6,12 +6,14 @@ use stripe::{
     Subscription as StripeSubscription,
 };
 
+use crate::api::sited_io::media::v1::MediaSubscriptionResponse;
 use crate::model::Subscription;
-use crate::{DbError, HttpError, MediaService};
+use crate::{DbError, HttpError, MediaService, Publisher};
 
 #[derive(Debug, Clone)]
 pub struct EventService {
     pool: Pool,
+    publisher: Publisher,
     media_service: MediaService,
 }
 
@@ -20,9 +22,14 @@ impl EventService {
     const METADATA_KEY_OFFER_ID: &'static str = "offer_id";
     const METADATA_KEY_SHOP_ID: &'static str = "shop_id";
 
-    pub fn new(pool: Pool, media_service: MediaService) -> Self {
+    pub fn new(
+        pool: Pool,
+        publisher: Publisher,
+        media_service: MediaService,
+    ) -> Self {
         Self {
             pool,
+            publisher,
             media_service,
         }
     }
@@ -81,6 +88,33 @@ impl EventService {
             payed_at,
             payed_until,
         ) {
+            self.publisher
+                .publish_subscription_upsert(&MediaSubscriptionResponse {
+                    media_subscription_id: subscription_id.to_string(),
+                    buyer_user_id: buyer_user_id.clone(),
+                    shop_id: shop_id.to_string(),
+                    offer_id: offer_id.to_string(),
+                    current_period_start: current_period_start
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                    current_period_end: current_period_end
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                    subscription_status: subscription_status.clone(),
+                    payed_at: payed_at.timestamp().try_into().unwrap(),
+                    payed_until: payed_until.timestamp().try_into().unwrap(),
+                    stripe_subscription_id: Some(
+                        stripe_subscription_id.clone(),
+                    ),
+                    canceled_at: canceled_at
+                        .map(|t| t.timestamp().try_into().unwrap()),
+                    cancel_at: cancel_at
+                        .map(|t| t.timestamp().try_into().unwrap()),
+                })
+                .await;
+
             self.media_service
                 .put_media_subscription(
                     subscription_id.to_string(),

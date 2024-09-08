@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpServer};
 
 use stripe_webhooks::{
     get_cors, get_env_var, init_db_pool, init_routes, migrate, AppSettings,
-    CredentialsService, EventService, MediaService,
+    CredentialsService, EventService, MediaService, Publisher,
 };
 
 #[actix_web::main]
@@ -37,6 +37,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // get AppSettings
     let app_settings = AppSettings::new(get_env_var("STRIPE_ENDPOINT_SECRET"));
 
+    // initialize NATS publisher
+    let publisher = Publisher::new(
+        async_nats::ConnectOptions::new()
+            .user_and_password(
+                get_env_var("NATS_USER"),
+                get_env_var("NATS_PASSWORD"),
+            )
+            .connect(get_env_var("NATS_HOST"))
+            .await?,
+    );
+
     // initialize media service client
     let media_service = MediaService::init(
         get_env_var("MEDIA_SERVICE_URL"),
@@ -52,8 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cors = get_cors(cors_allowed_origins.clone());
 
         // initialize event service
-        let event_service =
-            EventService::new(db_pool.clone(), media_service.clone());
+        let event_service = EventService::new(
+            db_pool.clone(),
+            publisher.clone(),
+            media_service.clone(),
+        );
 
         App::new()
             .wrap(cors)

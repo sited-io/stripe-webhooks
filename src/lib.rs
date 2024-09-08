@@ -7,6 +7,7 @@ mod error;
 mod events;
 mod media;
 mod model;
+mod publisher;
 mod routes;
 
 pub mod api;
@@ -17,6 +18,7 @@ pub use db::{init_db_pool, migrate, DbError};
 pub use error::HttpError;
 pub use events::EventService;
 pub use media::MediaService;
+pub use publisher::Publisher;
 pub use routes::init_routes;
 
 pub fn get_env_var(var: &str) -> String {
