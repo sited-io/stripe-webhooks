@@ -1,7 +1,6 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const MEDIA_PROTOS: &[&str] = &[
-        "service-apis/proto/sited_io/media/v1/media_subscription.proto",
-    ];
+    const MEDIA_PROTOS: &[&str] =
+        &["service-apis/proto/sited_io/media/v1/media_subscription.proto"];
 
     const INCLUDES: &[&str] = &["service-apis/proto"];
 

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use deadpool_postgres::tokio_postgres::Row;
-use deadpool_postgres::{GenericClient, Transaction};
+use deadpool_postgres::{GenericClient, Pool, Transaction};
 use sea_query::{
     Asterisk, Expr, Iden, OnConflict, PostgresQueryBuilder, Query,
 };
@@ -93,14 +93,16 @@ impl Subscription {
         Ok(row.map(Self::from))
     }
 
-    pub async fn put_checkout_session<'a>(
-        conn: &Transaction<'a>,
+    pub async fn put_checkout_session(
+        pool: &Pool,
         stripe_subscription_id: &String,
         buyer_user_id: &String,
         offer_id: &Uuid,
         shop_id: &Uuid,
         event_timestamp: i64,
     ) -> Result<Self, DbError> {
+        let conn = pool.get().await?;
+
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
             .columns(Self::PUT_CHECKOUT_SESSION_COLUMNS)
@@ -161,12 +163,14 @@ impl Subscription {
     }
 
     pub async fn put_invoice<'a>(
-        conn: &Transaction<'a>,
+        pool: &Pool,
         stripe_subscription_id: &String,
         payed_at: &DateTime<Utc>,
         payed_until: &DateTime<Utc>,
         event_timestamp: i64,
     ) -> Result<Self, DbError> {
+        let conn = pool.get().await?;
+
         let (sql, values) = Query::insert()
             .into_table(SubscriptionIden::Table)
             .columns(Self::PUT_INVOICE_COLUMNS)

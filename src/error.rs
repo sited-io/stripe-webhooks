@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
-use reqwest::StatusCode;
 
 #[derive(Debug, Clone)]
 pub struct HttpError {
@@ -47,6 +47,6 @@ impl std::error::Error for HttpError {}
 impl ResponseError for HttpError {
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
         let Self { status_code, body } = self;
-        HttpResponse::build(*status_code).json(body)
+        HttpResponse::build(status_code.into()).json(body)
     }
 }

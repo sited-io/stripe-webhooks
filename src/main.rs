@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors_allowed_origins = get_env_var("CORS_ALLOWED_ORIGINS");
 
-    tracing::log::info!("web server listening on {}", host);
+    tracing::info!("web server listening on {}", host);
 
     HttpServer::new(move || {
         let cors = get_cors(cors_allowed_origins.clone());

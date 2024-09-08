@@ -18,7 +18,7 @@ async fn webhook(
     let payload_string = match std::str::from_utf8(&payload) {
         Ok(s) => s.to_string(),
         Err(err) => {
-            tracing::log::error!("{err}");
+            tracing::error!("{err}");
             return Ok(HttpResponse::Ok().finish());
         }
     };
@@ -38,7 +38,7 @@ async fn webhook(
     ) {
         Ok(e) => e,
         Err(err) => {
-            tracing::log::error!("{payload_string} {err}");
+            tracing::error!("{payload_string} {err}");
             return Ok(HttpResponse::Ok().finish());
         }
     };

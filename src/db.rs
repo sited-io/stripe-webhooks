@@ -1,5 +1,6 @@
 use std::ops::DerefMut;
 
+use actix_web::http::StatusCode;
 use deadpool_postgres::tokio_postgres::error::SqlState;
 use deadpool_postgres::{
     tokio_postgres::NoTls, Config, CreatePoolError, Pool, PoolError, Runtime,
@@ -8,7 +9,6 @@ use deadpool_postgres::{
 use openssl::ssl::{SslConnector, SslMethod};
 use postgres_openssl::MakeTlsConnector;
 use refinery::Target;
-use reqwest::StatusCode;
 
 use crate::HttpError;
 
@@ -32,7 +32,7 @@ impl DbError {
                 if *err.code() == SqlState::SYNTAX_ERROR
                     && err.routine() == Some("toTSQuery")
                 {
-                    tracing::log::warn!("{:?}", err);
+                    tracing::warn!("{:?}", err);
                     return Ok(default);
                 }
             }
@@ -77,7 +77,7 @@ impl From<DbError> for HttpError {
                             err.message(),
                         ),
                         SqlState::SYNTAX_ERROR => {
-                            tracing::log::error!("{err:?}");
+                            tracing::error!("{err:?}");
                             HttpError::internal()
                         }
                         SqlState::FOREIGN_KEY_VIOLATION => {
@@ -87,25 +87,25 @@ impl From<DbError> for HttpError {
                             )
                         }
                         _ => {
-                            tracing::log::error!("{err:?}");
+                            tracing::error!("{err:?}");
                             HttpError::internal()
                         }
                     }
                 } else {
-                    tracing::log::error!("{tp_err:?}");
+                    tracing::error!("{tp_err:?}");
                     HttpError::internal()
                 }
             }
             DbError::Pool(pool_err) => {
-                tracing::log::error!("{pool_err:?}");
+                tracing::error!("{pool_err:?}");
                 HttpError::internal()
             }
             DbError::CreatePool(create_pool_err) => {
-                tracing::log::error!("{create_pool_err:?}");
+                tracing::error!("{create_pool_err:?}");
                 HttpError::internal()
             }
             DbError::SeaQuery(sea_query_err) => {
-                tracing::log::error!("{sea_query_err:?}");
+                tracing::error!("{sea_query_err:?}");
                 HttpError::internal()
             }
         }
@@ -142,10 +142,7 @@ pub fn init_db_pool(
 
 pub async fn migrate(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = pool.get().await.map_err(|err| {
-        tracing::log::error!(
-            "[migrate] Error while getting connection: {:?}",
-            err
-        );
+        tracing::error!("[migrate] Error while getting connection: {:?}", err);
         err
     })?;
 
@@ -155,7 +152,7 @@ pub async fn migrate(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
         .run_async(client.deref_mut().deref_mut())
         .await
         .map_err(|err| {
-            tracing::log::error!(
+            tracing::error!(
                 "[migrate] Error while running migrations: {:?}",
                 err
             );

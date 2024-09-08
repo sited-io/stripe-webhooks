@@ -78,13 +78,11 @@ impl CredentialsService {
             .await
         {
             Ok(response) => {
-                tracing::log::debug!(
-                    "[CredentialsService.get_token] {response:?}"
-                );
+                tracing::debug!("[CredentialsService.get_token] {response:?}");
                 response
             }
             Err(err) => {
-                tracing::log::error!("[CredentialsService.get_token] {err}");
+                tracing::error!("[CredentialsService.get_token] {err}");
                 return Err(Status::unauthenticated(""));
             }
         };
@@ -92,7 +90,7 @@ impl CredentialsService {
         let auth_response: AuthResponse = match response.json().await {
             Ok(auth_response) => auth_response,
             Err(err) => {
-                tracing::log::error!("[CredentialsService.get_token] {err}");
+                tracing::error!("[CredentialsService.get_token] {err}");
                 return Err(Status::unauthenticated(""));
             }
         };

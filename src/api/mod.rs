@@ -1,13 +1,13 @@
 pub mod sited_io {
-    pub mod media {
+    pub mod types {
         pub mod v1 {
-            include!("sited_io.media.v1.rs");
+            include!("sited_io.types.v1.rs");
         }
     }
 
-    pub mod pagination {
+    pub mod media {
         pub mod v1 {
-            include!("sited_io.pagination.v1.rs");
+            include!("sited_io.media.v1.rs");
         }
     }
 }
