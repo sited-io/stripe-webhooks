@@ -8,13 +8,12 @@ use stripe::{
 
 use crate::api::sited_io::media::v1::MediaSubscriptionResponse;
 use crate::model::Subscription;
-use crate::{DbError, HttpError, MediaService, Publisher};
+use crate::{DbError, HttpError, Publisher};
 
 #[derive(Debug, Clone)]
 pub struct EventService {
     pool: Pool,
     publisher: Publisher,
-    media_service: MediaService,
 }
 
 impl EventService {
@@ -22,16 +21,8 @@ impl EventService {
     const METADATA_KEY_OFFER_ID: &'static str = "offer_id";
     const METADATA_KEY_SHOP_ID: &'static str = "shop_id";
 
-    pub fn new(
-        pool: Pool,
-        publisher: Publisher,
-        media_service: MediaService,
-    ) -> Self {
-        Self {
-            pool,
-            publisher,
-            media_service,
-        }
+    pub fn new(pool: Pool, publisher: Publisher) -> Self {
+        Self { pool, publisher }
     }
 
     fn unexpected_object(event: &Event) -> HttpError {
@@ -114,29 +105,6 @@ impl EventService {
                         .map(|t| t.timestamp().try_into().unwrap()),
                 })
                 .await;
-
-            self.media_service
-                .put_media_subscription(
-                    subscription_id.to_string(),
-                    buyer_user_id,
-                    offer_id.to_string(),
-                    shop_id.to_string(),
-                    current_period_start.timestamp().try_into().unwrap(),
-                    current_period_end.timestamp().try_into().unwrap(),
-                    subscription_status,
-                    payed_at.timestamp().try_into().unwrap(),
-                    payed_until.timestamp().try_into().unwrap(),
-                    Some(stripe_subscription_id),
-                    canceled_at.map(|c| c.timestamp().try_into().unwrap()),
-                    cancel_at.map(|c| c.timestamp().try_into().unwrap()),
-                )
-                .await
-                .map_err(|err| {
-                    tracing::error!(
-                        "[EventService.send_updated_subscription] {err}"
-                    );
-                    HttpError::internal()
-                })?;
 
             tracing::info!("[EventService.send_updated_subscription] Sucessfully sent subscription to media api");
         }

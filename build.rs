@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .out_dir("src/api")
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(false)
-        .build_client(true)
+        .build_client(false)
         .compile(MEDIA_PROTOS, INCLUDES)?;
 
     Ok(())

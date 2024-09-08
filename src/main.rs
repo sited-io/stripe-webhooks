@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpServer};
 
 use stripe_webhooks::{
     get_cors, get_env_var, init_db_pool, init_routes, migrate, AppSettings,
-    CredentialsService, EventService, MediaService, Publisher,
+    EventService, Publisher,
 };
 
 #[actix_web::main]
@@ -26,14 +26,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     migrate(&db_pool).await?;
 
-    // initialize credentials service
-    let credentials_service = CredentialsService::new(
-        get_env_var("OAUTH_URL"),
-        get_env_var("OAUTH_HOST"),
-        get_env_var("SERVICE_USER_CLIENT_ID"),
-        get_env_var("SERVICE_USER_CLIENT_SECRET"),
-    );
-
     // get AppSettings
     let app_settings = AppSettings::new(get_env_var("STRIPE_ENDPOINT_SECRET"));
 
@@ -48,13 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?,
     );
 
-    // initialize media service client
-    let media_service = MediaService::init(
-        get_env_var("MEDIA_SERVICE_URL"),
-        credentials_service,
-    )
-    .await?;
-
     let cors_allowed_origins = get_env_var("CORS_ALLOWED_ORIGINS");
 
     tracing::info!("web server listening on {}", host);
@@ -63,11 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cors = get_cors(cors_allowed_origins.clone());
 
         // initialize event service
-        let event_service = EventService::new(
-            db_pool.clone(),
-            publisher.clone(),
-            media_service.clone(),
-        );
+        let event_service =
+            EventService::new(db_pool.clone(), publisher.clone());
 
         App::new()
             .wrap(cors)
