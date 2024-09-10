@@ -162,7 +162,7 @@ impl Subscription {
         Ok(Self::from(row))
     }
 
-    pub async fn put_invoice<'a>(
+    pub async fn put_invoice(
         pool: &Pool,
         stripe_subscription_id: &String,
         payed_at: &DateTime<Utc>,
@@ -191,6 +191,25 @@ impl Subscription {
         let row = conn.query_one(sql.as_str(), &values.as_params()).await?;
 
         Ok(Self::from(row))
+    }
+
+    pub async fn update_buyer_user_id<'a>(
+        conn: &Transaction<'a>,
+        stripe_subscription_id: &String,
+        buyer_user_id: &String,
+    ) -> Result<(), DbError> {
+        let (sql, values) = Query::update()
+            .table(SubscriptionIden::Table)
+            .value(SubscriptionIden::BuyerUserId, buyer_user_id)
+            .and_where(
+                Expr::col(SubscriptionIden::StripeSubscriptionId)
+                    .eq(stripe_subscription_id),
+            )
+            .build_postgres(PostgresQueryBuilder);
+
+        conn.query(sql.as_str(), &values.as_params()).await?;
+
+        Ok(())
     }
 }
 

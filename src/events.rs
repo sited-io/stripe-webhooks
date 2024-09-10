@@ -151,7 +151,7 @@ impl EventService {
     async fn handle_subscription(
         &self,
         subscription: StripeSubscription,
-        created: i64,
+        event_timestamp: i64,
     ) -> Result<HttpResponse, HttpError> {
         let stripe_subscription_id = subscription.id.to_string();
 
@@ -161,9 +161,36 @@ impl EventService {
         let found_subscription =
             Subscription::get(&transaction, &stripe_subscription_id).await?;
 
-        if found_subscription.is_none()
-            || found_subscription.is_some_and(|f| f.event_timestamp < created)
-        {
+        let mut update = false;
+
+        match found_subscription {
+            Some(found_subscription) => {
+                if found_subscription.event_timestamp < event_timestamp {
+                    update = true;
+                }
+
+                if let Some(metadata_user_id) =
+                    subscription.metadata.get(Self::METADATA_KEY_USER_ID)
+                {
+                    if found_subscription
+                        .buyer_user_id
+                        .is_some_and(|user_id| user_id != *metadata_user_id)
+                    {
+                        Subscription::update_buyer_user_id(
+                            &transaction,
+                            &stripe_subscription_id,
+                            metadata_user_id,
+                        )
+                        .await?;
+                    }
+                }
+            }
+            None => {
+                update = true;
+            }
+        }
+
+        if update {
             let current_period_start = DateTime::<Utc>::from_timestamp(
                 subscription.current_period_start,
                 0,
