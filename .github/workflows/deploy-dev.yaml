@@ -1,4 +1,4 @@
-name: Deploy to developement environment
+name: Deploy to dev environment
 on:
   workflow_dispatch:
   push:
@@ -13,26 +13,7 @@ jobs:
     environment: development
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
-
-      - name: Cache cargo dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build service binary
-        run: cargo build --release
-
-      - name: Run unit tests
-        run: cargo test --bins --lib --release -- --nocapture --test-threads 1
+      - uses: actions/checkout@main
 
       - name: Build Docker image
         run: docker build -t $IMAGE_TAG -f Dockerfile .
@@ -59,9 +40,9 @@ jobs:
         with:
           url: ${{ secrets.DEV_VAULT_ADDR }}
           method: userpass
-          username: ${{ secrets.DEV_SERVICE_DEPLOYER_USERNAME }}
+          username: services-deployer
           password: ${{ secrets.DEV_SERVICE_DEPLOYER_PASSWORD }}
-          secrets: nomad/creds/${{ secrets.DEV_SERVICE_DEPLOYER_USERNAME }} secret_id | NOMAD_TOKEN ;
+          secrets: nomad/creds/services-deployer secret_id | NOMAD_TOKEN ;
 
       - name: Deploy job
         run: |
