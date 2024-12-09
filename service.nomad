@@ -22,10 +22,6 @@ job "stripe-webhooks" {
               destination_name = "nats"
               local_bind_port = 4222
             }
-            upstreams {
-              destination_name = "media-api"
-              local_bind_port  = 10000
-            }
           }
         }
       }
@@ -86,7 +82,6 @@ STRIPE_ENDPOINT_SECRET='{{ .Data.data.STRIPE_ENDPOINT_SECRET }}'
 {{ end }}
 
 CORS_ALLOWED_ORIGINS=""
-MEDIA_SERVICE_URL='http://{{ env "NOMAD_UPSTREAM_ADDR_media-api" }}'
 EOF
       }
 
