@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("DB_ROOT_CERT").ok(),
     )?;
 
-    // migrate(&db_pool).await?;
+    migrate(&db_pool).await?;
 
     // get AppSettings
     let app_settings = AppSettings::new(get_env_var("STRIPE_ENDPOINT_SECRET"));
