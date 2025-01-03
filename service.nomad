@@ -22,6 +22,10 @@ job "stripe-webhooks" {
               destination_name = "nats"
               local_bind_port = 4222
             }
+            upstreams {
+              destination_name = "postgres-sql"
+              local_bind_port  = 5432
+            }
           }
         }
       }
@@ -65,6 +69,12 @@ HOST='0.0.0.0:{{ env "NOMAD_PORT_http" }}'
 NATS_HOST='{{ env "NOMAD_UPSTREAM_ADDR_nats" }}'
 NATS_USER='{{- with nomadVar "nomad/jobs" -}}{{ .NATS_USER }}{{- end -}}'
 NATS_PASSWORD='{{- with secret "kv2/data/services" -}}{{ .Data.data.NATS_PASSWORD }}{{- end -}}'
+
+DB_HOST='{{ env "NOMAD_UPSTREAM_IP_postgres-sql" }}'
+DB_PORT='{{ env "NOMAD_UPSTREAM_PORT_postgres-sql" }}'
+DB_DBNAME='stripe_webhooks'
+DB_USER='stripe_webhooks_user'
+DB_PASSWORD='{{- with secret "database/static-creds/stripe_webhooks_user" -}}{{ .Data.password }}{{- end -}}'
 
 {{ with nomadVar "nomad/jobs/stripe-webhooks"}}
 DB_HOST='{{ .DB_HOST }}'
