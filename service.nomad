@@ -76,17 +76,6 @@ DB_DBNAME='stripe_webhooks'
 DB_USER='stripe_webhooks_user'
 DB_PASSWORD='{{- with secret "database/static-creds/stripe_webhooks_user" -}}{{ .Data.password }}{{- end -}}'
 
-{{ with nomadVar "nomad/jobs/stripe-webhooks"}}
-DB_HOST='{{ .DB_HOST }}'
-DB_PORT='{{ .DB_PORT }}'
-DB_DBNAME='{{ .DB_DBNAME }}'
-DB_USER='{{ .DB_USER }}'
-{{ end }}
-DB_ROOT_CERT='{{ env "NOMAD_SECRETS_DIR" }}/database_root_cert.crt'
-{{ with secret "kv2/data/services/stripe-webhooks" }}
-DB_PASSWORD='{{ .Data.data.DB_PASSWORD }}'
-{{ end }}
-
 {{ with secret "kv2/data/services/stripe-webhooks" }}
 STRIPE_ENDPOINT_SECRET='{{ .Data.data.STRIPE_ENDPOINT_SECRET }}'
 {{ end }}
